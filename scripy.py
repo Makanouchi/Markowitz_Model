@@ -3,6 +3,7 @@ from datetime import date
 import numpy as np
 from datetime import timedelta
 import matplotlib.pyplot as plt
+import SessionState
 
 
 
@@ -86,83 +87,133 @@ html_temp1 = """
 		</div>
 		"""
 
+#side bar code
+html_sidebar = """
+  <style>
+    .reportview-container {
+      flex-direction: row-reverse;
+    }
 
-st.markdown(html_temp.format("yellow","Markowitz Optimization"),unsafe_allow_html=True)
+    header > .toolbar {
+      flex-direction: row-reverse;
+      left: 1rem;
+      right: auto;
+    }
 
+    .sidebar .sidebar-collapse-control,
+    .sidebar.--collapsed .sidebar-collapse-control {
+      left: auto;
+      right: 0.5rem;
+    }
+
+    .sidebar .sidebar-content {
+      transition: margin-right .3s, box-shadow .3s;
+    }
+
+    .sidebar.--collapsed .sidebar-content {
+      margin-left: auto;
+      margin-right: -21rem;
+    }
+
+    @media (max-width: 991.98px) {
+      .sidebar .sidebar-content {
+        margin-left: auto;
+      }
+    }
+  </style>
+"""
+
+PAGES = [
+    "Stock selection",
+    "Stock Trends",
+    "Daily Returns of Stock",
+    "Distribution of Returns",
+    "Portfolio Value"
+]
+st.markdown(html_sidebar, unsafe_allow_html=True)
+
+st.sidebar.title("Navigation:")
+selection = st.sidebar.radio("Go to", options=PAGES)
+
+
+#stocks list
 stocks=['AAPL', 'WMT', 'AMZN','GOOG','BA','MSFT','MMM','NKE','JNJ','MCD']
-icon("search")
-stock_list = st.multiselect('STOCKS TO ADD IN YOUR PORTFOLIO:',stocks)
 
-#st.title("Daily returns of stocks in PortFolio")
-st.markdown(html_temp1.format("yellow","Daily returns of Stocks"),unsafe_allow_html=True)
-data=getStockData(stock_list,date.today())
-daily_returns=getReturns(data)
-if(len(daily_returns)>0):
-	showReturns(daily_returns)
+#page selection
+session_state = SessionState.get(stock_list=[])
+if(selection=="Stock selection"):
+	st.markdown(html_temp.format("yellow","Stock Selection for Portfolio"),unsafe_allow_html=True)
+	icon("search")
+	session_state.stock_list = st.multiselect('STOCKS TO ADD IN YOUR PORTFOLIO:',stocks)
+if(selection=="Stock Trends"):
+	st.markdown(html_temp.format("yellow","Trends for Selected Stocks"),unsafe_allow_html=True)
+	data=getStockData(session_state.stock_list,date.today())
+	plt.figure(figsize=(10,6))
+	plt.plot(data)
+	plt.legend(session_state.stock_list)
 	st.pyplot()
-
-st.markdown(html_temp1.format("yellow","Distribution of returns"),unsafe_allow_html=True)
-daily_returns.hist(bins=100)
-st.pyplot()
-
-
-
-
-#st.markdown(html_temp1.format("yellow","Monte Carlo Simulation"),unsafe_allow_html=True)
-#st.write('expected_portfolio_returns:',expected_portfolio_returns(daily_returns,[0.25,0.25,0.25,0.25]))
-#st.write('variance:',stddev_returns(daily_returns,[0.25,0.25,0.25,0.25]))
-#preturns,pvariance=generateRandomPortfolios(stock_list,daily_returns)
-#plt.figure(figsize=(10,6))
-#plt.scatter(pvariance,preturns,c=preturns/pvariance,marker='o')
-#plt.grid(True)
-#plt.xlabel('Expected volatality')
-#plt.ylabel('Expected Return')
-#plt.plot(min_variance,max_return,'X')
-#plt.colorbar(label='Sharpe Ratio')
-#st.pyplot()
-
-#st.write('Optimal weights',optimum_weights)
-
-date_1=date.today()-timedelta(days=730)
-
-money=[]
-#money.append(1000)
-
-no_shares=np.zeros(len(stock_list))
-dates_for_plot=[]
-#st.write('Prev:',prev_weights)
-for i in range(10):
-	curr_date=date_1+timedelta(days=(30*i))
-	dates_for_plot.append(curr_date)
-	data=getStockData(stock_list,curr_date)
+if(selection=="Daily Returns of Stock"):
+	st.markdown(html_temp1.format("yellow","Daily returns of Stocks"),unsafe_allow_html=True)
+	data=getStockData(session_state.stock_list,date.today())
 	daily_returns=getReturns(data)
-	preturns,pvariance,optimum_weights=generateRandomPortfolios(stock_list,daily_returns)
-	price = yf.download(stock_list,str(curr_date+timedelta(days=1)),str(curr_date+timedelta(days=1)))['Open']
-	while(price.empty):
-		curr_date=curr_date+timedelta(days=1)
-		price = yf.download(stock_list,str(curr_date+timedelta(days=1)),str(curr_date+timedelta(days=1)))['Open']
-	#st.write("Prices:",price)
-	if(i==0):
-		money.append(1000)
-	else:
-		x=0
-		#st.write('No of shares',no_shares)
-		for j in range(len(stock_list)):
-			x=x+(no_shares[j]*price[stock_list[j]].iloc[0])
-		money.append(x)
-	curr_value=money[len(money)-1]
-	#st.write("Curr val",curr_value)
-	for j in range(len(stock_list)):
-		money_for_share=curr_value*optimum_weights[j]
-		no_shares[j]=money_for_share/price[stock_list[j]].iloc[0]
+	plt.figure(figsize=(10,6))
+	plt.plot(daily_returns)
+	plt.legend(session_state.stock_list)
+	st.pyplot()
+if(selection=="Distribution of Returns"):
+	st.markdown(html_temp1.format("yellow","Distribution of Stocks"),unsafe_allow_html=True)
+	data=getStockData(session_state.stock_list,date.today())
+	daily_returns=getReturns(data)
+	daily_returns.hist(bins=100)
+	st.pyplot()	
 
 
-plt.figure(figsize=(10,6))
-plt.plot(dates_for_plot,money,marker='o')
-plt.grid(True)
-plt.xlabel('Time')
-plt.ylabel('Value of PortFolio')
-st.pyplot()
+
+
+
+
+
+if(selection=="Portfolio Value"):
+
+	with st.spinner('Loading Portfolio value...'):
+		date_1=date.today()-timedelta(days=730)
+		money=[]
+		no_shares=np.zeros(len(session_state.stock_list))
+		dates_for_plot=[]
+
+		for i in range(10):
+			curr_date=date_1+timedelta(days=(30*i))
+			dates_for_plot.append(curr_date)
+			data=getStockData(session_state.stock_list,curr_date)
+			daily_returns=getReturns(data)
+			preturns,pvariance,optimum_weights=generateRandomPortfolios(session_state.stock_list,daily_returns)
+			price = yf.download(session_state.stock_list,str(curr_date+timedelta(days=1)),str(curr_date+timedelta(days=1)))['Open']
+			while(price.empty):
+				curr_date=curr_date+timedelta(days=1)
+				price = yf.download(session_state.stock_list,str(curr_date+timedelta(days=1)),str(curr_date+timedelta(days=1)))['Open']
+			#st.write("Prices:",price)
+			if(i==0):
+				money.append(1000)
+			else:
+				x=0
+				#st.write('No of shares',no_shares)
+				for j in range(len(session_state.stock_list)):
+					x=x+(no_shares[j]*price[session_state.stock_list[j]].iloc[0])
+				money.append(x)
+			curr_value=money[len(money)-1]
+			#st.write("Curr val",curr_value)
+			for j in range(len(session_state.stock_list)):
+				money_for_share=curr_value*optimum_weights[j]
+				no_shares[j]=money_for_share/price[session_state.stock_list[j]].iloc[0]
+
+
+	plt.figure(figsize=(10,6))
+	plt.plot(dates_for_plot,money,marker='o')
+	plt.grid(True)
+	plt.xlabel('Time')
+	plt.ylabel('Value of PortFolio')
+	st.pyplot()
+	st.balloons()
 
 
 	
