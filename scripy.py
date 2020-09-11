@@ -4,8 +4,10 @@ import numpy as np
 from datetime import timedelta
 import matplotlib.pyplot as plt
 import SessionState
-
-
+from img_map import *
+from PIL import Image
+image = Image.open('img/icon-image.jpg')
+import os
 
 
 #stock_list= ['WMT','AAPL']
@@ -60,8 +62,22 @@ def generateRandomPortfolios(stocks,daily_returns):
 	return preturns,pvariance,optimum_weights
 
 
+def img_to_bytes(img_path):
+    img_bytes = os.path(img_path).read_bytes()
+    encoded = base64.b64encode(img_bytes).decode()
+    return encoded
+
 
 import streamlit as st
+
+#add defaults settings
+st.beta_set_page_config(
+    page_title="Portfolio Optimization App",
+    page_icon=image,
+	layout="wide",
+    initial_sidebar_state="expanded",
+)
+
 
 def local_css(file_name):
     with open(file_name) as f:
@@ -77,12 +93,12 @@ def icon(icon_name):
 local_css("style.css")
 remote_css('https://fonts.googleapis.com/icon?family=Material+Icons')
 html_temp = """
-		<div style="background-color:#4F8BF9;padding:10px">
-		<h1 style="color:{};text-align:center;">{}</h1>
+		<div style="background-color:black;padding:10px">
+		<i><b><u><h1 style="color:{};text-align:center;">{}</h1></u></b></i>
 		</div>
 		"""
 html_temp1 = """
-		<div style="background-color:#4F8BF9;padding:10px">
+		<div style="background-color:black;padding:10px">
 		<h2 style="color:{};text-align:center;">{}</h2>
 		</div>
 		"""
@@ -143,8 +159,16 @@ stocks=['AAPL', 'WMT', 'AMZN','GOOG','BA','MSFT','MMM','NKE','JNJ','MCD']
 session_state = SessionState.get(stock_list=[])
 if(selection=="Stock selection"):
 	st.markdown(html_temp.format("yellow","Stock Selection for Portfolio"),unsafe_allow_html=True)
+	st.markdown(html_temp1.format("yellow","STOCKS TO ADD IN YOUR PORTFOLIO:"),unsafe_allow_html=True)
 	icon("search")
-	session_state.stock_list = st.multiselect('STOCKS TO ADD IN YOUR PORTFOLIO:',stocks)
+	session_state.stock_list = st.multiselect('',stocks)
+	img_list=[]
+	for i in session_state.stock_list:
+		image = Image.open(map_for_images[i]).convert("RGB")
+		image=image.resize((100,100))
+		img_list.append(image)
+	st.image(img_list)
+		
 if(selection=="Stock Trends"):
 	st.markdown(html_temp.format("yellow","Trends for Selected Stocks"),unsafe_allow_html=True)
 	data=getStockData(session_state.stock_list,date.today())
@@ -153,7 +177,7 @@ if(selection=="Stock Trends"):
 	plt.legend(session_state.stock_list)
 	st.pyplot()
 if(selection=="Daily Returns of Stock"):
-	st.markdown(html_temp1.format("yellow","Daily returns of Stocks"),unsafe_allow_html=True)
+	st.markdown(html_temp.format("yellow","Daily returns of Stocks"),unsafe_allow_html=True)
 	data=getStockData(session_state.stock_list,date.today())
 	daily_returns=getReturns(data)
 	plt.figure(figsize=(10,6))
@@ -161,7 +185,7 @@ if(selection=="Daily Returns of Stock"):
 	plt.legend(session_state.stock_list)
 	st.pyplot()
 if(selection=="Distribution of Returns"):
-	st.markdown(html_temp1.format("yellow","Distribution of Stocks"),unsafe_allow_html=True)
+	st.markdown(html_temp.format("yellow","Distribution of Stocks"),unsafe_allow_html=True)
 	data=getStockData(session_state.stock_list,date.today())
 	daily_returns=getReturns(data)
 	daily_returns.hist(bins=100)
@@ -174,7 +198,7 @@ if(selection=="Distribution of Returns"):
 
 
 if(selection=="Portfolio Value"):
-
+	st.markdown(html_temp.format("yellow","Portfolio Value"),unsafe_allow_html=True)
 	with st.spinner('Loading Portfolio value...'):
 		date_1=date.today()-timedelta(days=730)
 		money=[]
@@ -213,7 +237,7 @@ if(selection=="Portfolio Value"):
 	plt.xlabel('Time')
 	plt.ylabel('Value of PortFolio')
 	st.pyplot()
-	st.balloons()
+	st.success("Plot generated Successfully")
 
 
 	
