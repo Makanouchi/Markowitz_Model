@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import SessionState
 from img_map import *
 from PIL import Image
+import pandas_datareader as web # for market capital
 image = Image.open('img/icon-image.jpg')
 import os
 
@@ -148,8 +149,13 @@ PAGES = [
 ]
 st.markdown(html_sidebar, unsafe_allow_html=True)
 
-st.sidebar.title("Navigation:")
-selection = st.sidebar.radio("Go to", options=PAGES)
+html_temp3 = """
+		<div style="padding:10px">
+		<i><b><u><h1 style="color:{};text-align:center;">{}</h1></u></b></i>
+		</div>
+		"""
+st.sidebar.markdown(html_temp3.format("blue","Navigation"),unsafe_allow_html=True)
+selection = st.sidebar.radio("", options=PAGES)
 
 
 #stocks list
@@ -205,34 +211,80 @@ if(selection=="Portfolio Value"):
 		no_shares=np.zeros(len(session_state.stock_list))
 		dates_for_plot=[]
 
+		money_cap=[]
+		no_shares_cap=np.zeros(len(session_state.stock_list))
+
 		for i in range(10):
 			curr_date=date_1+timedelta(days=(30*i))
 			dates_for_plot.append(curr_date)
-			data=getStockData(session_state.stock_list,curr_date)
+			data=getStockData(session_state.stock_list,curr_date-timedelta(days=1))
 			daily_returns=getReturns(data)
 			preturns,pvariance,optimum_weights=generateRandomPortfolios(session_state.stock_list,daily_returns)
-			price = yf.download(session_state.stock_list,str(curr_date+timedelta(days=1)),str(curr_date+timedelta(days=1)))['Open']
+			#optimum_weights=np.ones(len(session_state.stock_list))
+			#optimum_weights= optimum_weights/np.sum(optimum_weights)
+			price = yf.download(session_state.stock_list,str(curr_date),str(curr_date))['Adj Close']
 			while(price.empty):
 				curr_date=curr_date+timedelta(days=1)
-				price = yf.download(session_state.stock_list,str(curr_date+timedelta(days=1)),str(curr_date+timedelta(days=1)))['Open']
+				price = yf.download(session_state.stock_list,str(curr_date),str(curr_date))['Adj Close']
 			#st.write("Prices:",price)
 			if(i==0):
 				money.append(1000)
+				money_cap.append(1000)
 			else:
 				x=0
 				#st.write('No of shares',no_shares)
 				for j in range(len(session_state.stock_list)):
 					x=x+(no_shares[j]*price[session_state.stock_list[j]].iloc[0])
 				money.append(x)
+
+				#for market capital
+				y=0
+				for j in range(len(session_state.stock_list)):
+					y=y+(no_shares_cap[j]*price[session_state.stock_list[j]].iloc[0])
+				money_cap.append(y)
+
 			curr_value=money[len(money)-1]
 			#st.write("Curr val",curr_value)
+			curr_value_cap=money_cap[len(money_cap)-1]
+
+			# getting weights for market capital ratios
+			market_cap_weights =np.array(web.get_quote_yahoo(session_state.stock_list,curr_date,curr_date)['marketCap'])
+			market_cap_weights=market_cap_weights/np.sum(market_cap_weights)
+
 			for j in range(len(session_state.stock_list)):
 				money_for_share=curr_value*optimum_weights[j]
 				no_shares[j]=money_for_share/price[session_state.stock_list[j]].iloc[0]
+				#for market capital ratios
+				money_for_share=curr_value_cap*market_cap_weights[j]
+				no_shares_cap[j]=money_for_share/price[session_state.stock_list[j]].iloc[0]
+
+			for single_date in (curr_date+timedelta(1) + timedelta(n) for n in range(29)):
+				price = yf.download(session_state.stock_list,str(single_date),str(single_date))['Adj Close']
+				if(price.empty):
+					continue
+				dates_for_plot.append(single_date)
+
+				x=0
+				#st.write('No of shares',no_shares)
+				for j in range(len(session_state.stock_list)):
+					x=x+(no_shares[j]*price[session_state.stock_list[j]].iloc[0])
+				money.append(x)
+
+				#for market capital
+
+				y=0
+				#st.write('No of shares',no_shares)
+				for j in range(len(session_state.stock_list)):
+					y=y+(no_shares_cap[j]*price[session_state.stock_list[j]].iloc[0])
+				money_cap.append(y)
+
+		
 
 
 	plt.figure(figsize=(10,6))
-	plt.plot(dates_for_plot,money,marker='o')
+	p1,=plt.plot(dates_for_plot,money,marker='^',label="Markowitz Model")
+	p2,=plt.plot(dates_for_plot,money_cap,marker='o',label="Market Capital Ratio")
+	plt.legend(handles=[p1, p2])
 	plt.grid(True)
 	plt.xlabel('Time')
 	plt.ylabel('Value of PortFolio')
